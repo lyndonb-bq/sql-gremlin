@@ -45,17 +45,23 @@ public class QueryPlanner {
 
     public RelNode plan(String sql) {
         try {
+            System.out.println("Parsing : " + sql);
             final SqlNode parse = planner.parse(sql);
 
+            System.out.println("Validating...");
             final SqlNode validate = planner.validate(parse);
+            System.out.println("Rel root...");
             final RelRoot convert = planner.rel(validate);
 
             // final RelNode convert = planner.convert(validate);
+            System.out.println("Replacing trait set...");
             final RelTraitSet traitSet = planner.getEmptyTraitSet()
                     .replace(EnumerableConvention.INSTANCE);
 
+            System.out.println("Transform...");
             return planner.transform(0, traitSet, convert.project());
         } catch (final Exception e) {
+            System.out.println("Exception e: " + e.getMessage());
             throw new ParseException("Error parsing: " + sql + " - " + e, e);
         }
     }

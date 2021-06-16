@@ -94,31 +94,44 @@ public class SqlToGremlin {
     }
 
     public SingleQueryExecutor.SqlGremlinQueryResult execute(final String sql) throws SQLException {
+        System.out.println("Execute starting with sql: " + sql);
         final QueryPlanner queryPlanner = new QueryPlanner(frameworkConfig);
+        System.out.println("queryPlanner created.");
         final RelNode node = queryPlanner.plan(sql);
+        System.out.println("queryPlanner planned.");
 
         // Determine if we need to break the logical plan off and run part via Gremlin & part Calcite
         RelNode root = node;
         if (!isConvertable(node)) {
+            System.out.println("!isConvertable.");
             // go until we hit a converter to find the input
             root = root.getInput(0);
             while (!isConvertable(root)) {
+                System.out.println("while (!isConvertable(root)).");
                 root = root.getInput(0);
             }
         }
 
         // Get all scan chunks.  A scan chunk is a table scan and any additional operators that we've
         // pushed down like filters.
+        System.out.println("ScanVisitor.");
         final ScanVisitor scanVisitor = new ScanVisitor();
+        System.out.println("RelWalker.");
         new RelWalker(root, scanVisitor);
+        System.out.println("getScanMap.");
         final Map<GremlinToEnumerableConverter, List<RelNode>> scanMap = scanVisitor.getScanMap();
 
         // Simple case, no joins.
         if (scanMap.size() == 1) {
+            System.out.println("scanMap.size() == 1.");
             final GraphTraversal<?, ?> traversal = g.V();
+            System.out.println("appendTraversal.");
             TraversalBuilder.appendTraversal(scanMap.values().iterator().next(), traversal);
+            System.out.println("getTableDef.");
             final TableDef table = TableUtil.getTableDef(scanMap.values().iterator().next());
+            System.out.println("SingleQueryExecutor.");
             final SingleQueryExecutor queryExec = new SingleQueryExecutor(node, traversal, table);
+            System.out.println("handle.");
             return queryExec.handle();
         } else {
             throw new SQLException("Join queries are not currently supported.");

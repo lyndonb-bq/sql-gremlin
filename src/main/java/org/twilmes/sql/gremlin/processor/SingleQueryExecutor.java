@@ -143,35 +143,45 @@ public class SingleQueryExecutor {
     public SqlGremlinQueryResult handle() {
         SqlGremlinQueryResult result = null;
         if (!isConvertable(node)) {
+            System.out.println("if (!isConvertable(node))");
             // go until we hit a converter to find the input
             RelNode input = node;
             RelNode parent = node;
             while (!((input = input.getInput(0)) instanceof GremlinToEnumerableConverter)) {
+                System.out.println("while (!((input = input.getInput(0)) instanceof GremlinToEnumerableConverter)) {");
                 parent = input;
             }
             final RelDataType rowType = input.getRowType();
+            System.out.println("getFieldNames");
             final List<String> fieldNames = rowType.getFieldNames();
+            System.out.println("getFieldNames - " + fieldNames);
 
             final List<Map<Object, Object>> results = traversal.valueMap().with(WithOptions.tokens).toList();
             final List<Object> rows = new ArrayList<>();
             int idx = 0;
             for (final Map<Object, Object> mapResult : results) {
+                System.out.println("Results - " + results);
                 idx = 0;
                 final Object[] row = new Object[fieldNames.size()];
                 for (final String field : fieldNames) {
+                    System.out.println("field - " + field);
                     final String propName = TableUtil.getProperty(table, field);
                     final int keyIndex = propName.toLowerCase().indexOf("_id");
                     Object val = null;
                     if (keyIndex > 0) {
+                        System.out.println("keyIndex > 0 ");
                         // Could be PK or FK.
                         final String key = propName.substring(0, keyIndex);
                         if (table.label.toLowerCase().equals(key.toLowerCase())) {
+                            System.out.println("if (table.label.toLowerCase().equals(key.toLowerCase())) {");
                             val = mapResult.get(propName);
                         } else {
                             // todo add fk (connected vertex) ids
                         }
                     } else {
+                        System.out.println("else");
                         if (mapResult.containsKey(propName)) {
+                            System.out.println("if (mapResult.containsKey(propName)) {");
                             val = ((List) mapResult.get(propName)).get(0);
                             val = TableUtil.convertType(val, table.getColumn(field));
                         }
@@ -182,24 +192,32 @@ public class SingleQueryExecutor {
                 rows.add(row);
             }
 
+            System.out.println("traversalScan");
             final GremlinTraversalScan traversalScan =
                     new GremlinTraversalScan(input.getCluster(), input.getTraitSet(), rowType, rows);
 
+            System.out.println("converter");
             final GremlinTraversalToEnumerableRelConverter converter =
                     new GremlinTraversalToEnumerableRelConverter(input.getCluster(), input.getTraitSet(), traversalScan,
                             rowType);
+            System.out.println("replaceInput");
             parent.replaceInput(0, converter);
 
+            System.out.println("EnumerableInterpretable");
             final Bindable bindable =
                     EnumerableInterpretable
                             .toBindable(ImmutableMap.of(), null, (EnumerableRel) node, EnumerableRel.Prefer.ARRAY);
 
+            System.out.println("bind");
             final Enumerable<Object> enumerable = bindable.bind(null);
 
+            System.out.println("toList");
             final List<Object> rowResults = enumerable.toList();
+            System.out.println("SqlGremlinQueryResult");
             result = new SqlGremlinQueryResult(input.getCluster().getPlanner().getRoot().getRowType().getFieldNames(),
                     rowResults, table);
         }
+        System.out.println("return result");
         return result;
     }
 
