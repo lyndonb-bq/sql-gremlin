@@ -111,15 +111,19 @@ public class GremlinSqlAggFunction extends GremlinSqlOperator {
                 };
         public static GremlinSqlTraversalAppender COUNT =
                 (GraphTraversal<?, ?> graphTraversal, List<GremlinSqlNode> operands) -> {
+                    graphTraversal.count();
                 };
         public static GremlinSqlTraversalAppender SUM =
                 (GraphTraversal<?, ?> graphTraversal, List<GremlinSqlNode> operands) -> {
+                    graphTraversal.sum();
                 };
         public static GremlinSqlTraversalAppender MIN =
                 (GraphTraversal<?, ?> graphTraversal, List<GremlinSqlNode> operands) -> {
+                    graphTraversal.min();
                 };
         public static GremlinSqlTraversalAppender MAX =
                 (GraphTraversal<?, ?> graphTraversal, List<GremlinSqlNode> operands) -> {
+                    graphTraversal.max();
                 };
 
         // TODO: What is SUM0 vs SUM?
