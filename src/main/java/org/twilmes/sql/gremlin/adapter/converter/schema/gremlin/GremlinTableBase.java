@@ -39,12 +39,12 @@ import java.util.Map;
 
 @Getter
 public class GremlinTableBase extends AbstractQueryableTable implements TranslatableTable {
-    private final String label;
-    private final Boolean isVertex;
-    private final Map<String, GremlinProperty> columns;
     public static String ID = "_ID";
     public static String IN_ID = "_IN" + ID;
     public static String OUT_ID = "_OUT" + ID;
+    private final String label;
+    private final Boolean isVertex;
+    private final Map<String, GremlinProperty> columns;
 
     public GremlinTableBase(final String label, final Boolean isVertex,
                             final Map<String, GremlinProperty> columns) {
@@ -61,11 +61,13 @@ public class GremlinTableBase extends AbstractQueryableTable implements Translat
             }
         }
         throw new SQLException(String.format(
-                "Error: Could not find column '%s' on %s with label '%s'.", column, isVertex ? "vertex" : "edge", label));
+                "Error: Could not find column '%s' on %s with label '%s'.", column, isVertex ? "vertex" : "edge",
+                label));
     }
 
     @Override
-    public <T> Queryable<T> asQueryable(final QueryProvider queryProvider, final SchemaPlus schema, final String tableName) {
+    public <T> Queryable<T> asQueryable(final QueryProvider queryProvider, final SchemaPlus schema,
+                                        final String tableName) {
         return null;
     }
 
@@ -75,7 +77,8 @@ public class GremlinTableBase extends AbstractQueryableTable implements Translat
         for (int i = 0; i < fields.length; i++) {
             fields[i] = i;
         }
-        return new GremlinTableScan(context.getCluster(), context.getCluster().traitSetOf(GremlinRel.CONVENTION), relOptTable, fields);
+        return new GremlinTableScan(context.getCluster(), context.getCluster().traitSetOf(GremlinRel.CONVENTION),
+                relOptTable, fields);
     }
 
     @Override
@@ -90,25 +93,22 @@ public class GremlinTableBase extends AbstractQueryableTable implements Translat
     }
 
     private Class<?> getType(final String className) {
-        switch (className) {
-            case "string":
-                return String.class;
-            case "integer":
-                return Integer.class;
-            case "double":
-                return Double.class;
-            case "long":
-                return Long.class;
-            case "boolean":
-                return Boolean.class;
-            case "date":
-            case "long_date":
-                return java.sql.Date.class;
-            case "timestamp":
-            case "long_timestamp":
-                return java.sql.Timestamp.class;
-            default:
-                return null;
+        if (className.equalsIgnoreCase("string")) {
+            return String.class;
+        } else if (className.equalsIgnoreCase("integer")) {
+            return Integer.class;
+        } else if (className.equalsIgnoreCase("double")) {
+            return Double.class;
+        } else if (className.equalsIgnoreCase("long")) {
+            return Long.class;
+        } else if (className.equalsIgnoreCase("boolean")) {
+            return Boolean.class;
+        } else if (className.equalsIgnoreCase("date") || className.equalsIgnoreCase("long_date")) {
+            return java.sql.Date.class;
+        } else if (className.equalsIgnoreCase("timestamp") || className.equalsIgnoreCase("long_timestamp")) {
+            return java.sql.Timestamp.class;
+        } else {
+            return null;
         }
     }
 }

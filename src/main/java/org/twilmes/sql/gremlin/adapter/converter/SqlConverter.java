@@ -21,14 +21,10 @@ package org.twilmes.sql.gremlin.adapter.converter;
 
 import com.google.common.collect.ImmutableList;
 import lombok.Getter;
-import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.config.Lex;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelTraitDef;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
@@ -57,12 +53,14 @@ import java.util.List;
  */
 public class SqlConverter {
     private static final Logger LOGGER = LoggerFactory.getLogger(SqlConverter.class);
+    private static final List<RelTraitDef> TRAIT_DEFS =
+            ImmutableList.of(ConventionTraitDef.INSTANCE, RelCollationTraitDef.INSTANCE);
+    private static final SqlParser.Config PARSER_CONFIG = SqlParser.configBuilder().setLex(Lex.MYSQL).build();
+    private static final Program PROGRAM =
+            Programs.sequence(Programs.ofRules(Programs.RULE_SET), Programs.CALC_PROGRAM);
     private final FrameworkConfig frameworkConfig;
     private final GraphTraversalSource g;
     private final GremlinSchema gremlinSchema;
-    private static final List<RelTraitDef> TRAIT_DEFS = ImmutableList.of(ConventionTraitDef.INSTANCE, RelCollationTraitDef.INSTANCE);
-    private static final SqlParser.Config PARSER_CONFIG = SqlParser.configBuilder().setLex(Lex.MYSQL).build();
-    private static final Program PROGRAM = Programs.sequence(Programs.ofRules(Programs.RULE_SET), Programs.CALC_PROGRAM);
 
 
     public SqlConverter(final GremlinSchema gremlinSchema, final GraphTraversalSource g) {
@@ -79,16 +77,24 @@ public class SqlConverter {
 
     // NOT THREAD SAFE
     public SqlGremlinQueryResult executeQuery(final String query) throws SQLException {
+        LOGGER.info("Starting SQL query execution.");
+
         final SqlMetadata sqlMetadata = new SqlMetadata(g, gremlinSchema);
+        LOGGER.info("Setting metadata.");
         GremlinSqlFactory.setSqlMetadata(sqlMetadata);
-        // Not sure if this can be re-used?
+
+        LOGGER.info("Creating query planner.");
         final QueryPlanner queryPlanner = new QueryPlanner(frameworkConfig);
 
+        LOGGER.info("Planning query.");
         queryPlanner.plan(query);
         final SqlNode sqlNode = queryPlanner.getValidate();
 
         if (sqlNode instanceof SqlSelect) {
+            LOGGER.info("Creating SqlSelect.");
             final GremlinSqlSelect gremlinSqlSelect = GremlinSqlFactory.createSelect((SqlSelect) sqlNode, g);
+
+            LOGGER.info("Executing Traversal.");
             return gremlinSqlSelect.executeTraversal();
         } else {
             throw new SQLException("Only sql select statements are supported right now.");
@@ -113,13 +119,14 @@ public class SqlConverter {
     }
 
     public String getStringTraversal(final String query) throws SQLException {
-        return GroovyTranslator.of("g").translate(getGraphTraversal(query).asAdmin().getBytecode());
+        return GroovyTranslator.of("g").translate(getGraphTraversal(query).asAdmin().getBytecode()).toString();
     }
 
     @Getter
     private static class QueryPlanner {
         private final Planner planner;
         private SqlNode validate;
+
         public QueryPlanner(final FrameworkConfig frameworkConfig) {
             this.planner = Frameworks.getPlanner(frameworkConfig);
         }

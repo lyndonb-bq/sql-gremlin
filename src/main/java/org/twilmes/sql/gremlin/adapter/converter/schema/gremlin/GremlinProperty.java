@@ -32,4 +32,9 @@ import lombok.Setter;
 public class GremlinProperty {
     private final String name;
     private final String type;
+
+    public String getType() {
+        System.out.println("Type: " + type);
+        return type;
+    }
 }

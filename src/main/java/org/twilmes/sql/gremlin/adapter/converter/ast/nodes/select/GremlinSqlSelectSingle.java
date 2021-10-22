@@ -24,7 +24,6 @@ import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.tinkerpop.gremlin.groovy.jsr223.GroovyTranslator;
-import org.apache.tinkerpop.gremlin.process.traversal.Step;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__;
@@ -69,20 +68,24 @@ public class GremlinSqlSelectSingle extends GremlinSqlSelect {
         this.sqlMetadata = sqlMetadata;
         this.g = g;
         this.sqlBasicCall = sqlBasicCall;
+        LOGGER.info("Single SELECT query.");
     }
 
     @Override
     protected void runTraversalExecutor(final GraphTraversal<?, ?> graphTraversal,
                                         final SqlGremlinQueryResult sqlGremlinQueryResult) throws SQLException {
         // Launch thread to continue grabbing results.
+        LOGGER.info("Launching Data-Insert-Thread.");
         final ExecutorService executor = Executors.newSingleThreadExecutor(
                 new ThreadFactoryBuilder().setNameFormat("Data-Insert-Thread-%d").setDaemon(true).build());
         final List<List<String>> columns = new ArrayList<>(sqlMetadata.getColumnOutputListMap().values());
         if (columns.size() != 1) {
             throw new SQLException("Error: Single select has multi-table return.");
         }
+        LOGGER.info("Starting Pagination with SimpleDataReader.");
         executor.execute(new Pagination(new SimpleDataReader(sqlMetadata.getTables().iterator().next(), columns.get(0)),
                 graphTraversal, sqlGremlinQueryResult));
+        System.out.println("Shutdown");
         executor.shutdown();
     }
 
@@ -109,13 +112,27 @@ public class GremlinSqlSelectSingle extends GremlinSqlSelect {
         final GraphTraversal<?, ?> graphTraversal =
                 SqlTraversalEngine.generateInitialSql(gremlinSqlIdentifiers, sqlMetadata, g);
         final String label = sqlMetadata.getActualTableName(gremlinSqlIdentifiers.get(0).getName(1));
+
+        LOGGER.debug("Applying group by");
         applyGroupBy(graphTraversal, label);
+
+        LOGGER.debug("Applying select");
         applySelectValues(graphTraversal);
+
+        LOGGER.debug("Applying order by");
         applyOrderBy(graphTraversal, label);
+
+        LOGGER.debug("Applying having");
         applyHaving(graphTraversal);
+
+        LOGGER.debug("Applying aggregate fold");
         SqlTraversalEngine.applyAggregateFold(sqlMetadata, graphTraversal);
+
+        LOGGER.debug("Applying projection");
         SqlTraversalEngine.addProjection(gremlinSqlIdentifiers, sqlMetadata, graphTraversal);
         final String projectLabel = gremlinSqlIdentifiers.get(1).getName(0);
+
+        LOGGER.debug("Applying column retrieval");
         applyColumnRetrieval(graphTraversal, projectLabel,
                 GremlinSqlFactory.createNodeList(sqlSelect.getSelectList().getList()));
 
@@ -129,7 +146,7 @@ public class GremlinSqlSelectSingle extends GremlinSqlSelect {
     }
 
     public String getStringTraversal() throws SQLException {
-        return GroovyTranslator.of("g").translate(generateTraversal().asAdmin().getBytecode());
+        return GroovyTranslator.of("g").translate(generateTraversal().asAdmin().getBytecode()).toString();
     }
 
     private void applySelectValues(final GraphTraversal<?, ?> graphTraversal) {

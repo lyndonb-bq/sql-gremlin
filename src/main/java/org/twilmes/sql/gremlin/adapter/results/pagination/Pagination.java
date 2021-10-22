@@ -20,6 +20,7 @@
 package org.twilmes.sql.gremlin.adapter.results.pagination;
 
 import lombok.AllArgsConstructor;
+import org.apache.tinkerpop.gremlin.groovy.jsr223.GroovyTranslator;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +33,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-@AllArgsConstructor
 public class Pagination implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(Pagination.class);
     private static final int DEFAULT_PAGE_SIZE = 1000;
@@ -41,14 +41,30 @@ public class Pagination implements Runnable {
     private final GraphTraversal<?, ?> traversal;
     private final SqlGremlinQueryResult sqlGremlinQueryResult;
 
+    public Pagination(final GetRowFromMap getRowFromMap, final GraphTraversal<?, ?> traversal,
+                      final SqlGremlinQueryResult sqlGremlinQueryResult) {
+        System.out.println("PAGINATION START");
+        this.getRowFromMap = getRowFromMap;
+        this.traversal = traversal;
+        this.sqlGremlinQueryResult = sqlGremlinQueryResult;
+        System.out.println("PAGINATION END");
+    }
+
     @Override
     public void run() {
+        System.out.println("RUN START");
         try {
+            System.out.println("Entry try");
+            System.out.println(
+                    "Starting pagination '" + GroovyTranslator.of("g").translate(traversal.asAdmin().getBytecode()) +
+                            "'");
             while (traversal.hasNext()) {
+                System.out.println("hasNext.");
                 final List<Object> rows = new ArrayList<>();
                 traversal.next(pageSize).forEach(map -> rows.add(getRowFromMap.execute((Map<String, Object>) map)));
                 convertAndInsertResult(sqlGremlinQueryResult, rows);
             }
+            System.out.println("assertIsEmpty.");
             // If we run out of traversal data (or hit our limit), stop and signal to the result that it is done.
             sqlGremlinQueryResult.assertIsEmpty();
         } catch (final Exception e) {
@@ -58,12 +74,14 @@ public class Pagination implements Runnable {
             LOGGER.error("Encountered exception", e);
             sqlGremlinQueryResult.setPaginationException(new SQLException(e + pw.toString()));
         }
+        System.out.println("RUN END");
     }
 
     /**
      * converts input row results and insert them into sqlGremlinQueryResult
      */
     void convertAndInsertResult(final SqlGremlinQueryResult sqlGremlinQueryResult, final List<Object> rows) {
+        System.out.println("convertAndInsertResult");
         final List<List<Object>> finalRowResult = new ArrayList<>();
         for (final Object row : rows) {
             final List<Object> convertedRow = new ArrayList<>();

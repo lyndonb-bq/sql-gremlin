@@ -25,7 +25,6 @@ import org.apache.calcite.sql.JoinType;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
-import org.apache.tinkerpop.gremlin.groovy.jsr223.GroovyTranslator;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__;
@@ -71,6 +70,7 @@ public class GremlinSqlSelectMulti extends GremlinSqlSelect {
         this.sqlSelect = sqlSelect;
         this.g = g;
         this.sqlJoin = sqlJoin;
+        LOGGER.info("Multi SELECT query.");
     }
 
     @Override
@@ -92,6 +92,7 @@ public class GremlinSqlSelectMulti extends GremlinSqlSelect {
         final JoinType joinType = sqlJoin.getJoinType();
         final JoinConditionType conditionType = sqlJoin.getConditionType();
 
+        LOGGER.debug("Obtaining left and right join tables.");
         final GremlinSqlBasicCall left =
                 GremlinSqlFactory.createNodeCheckType(sqlJoin.getLeft(), GremlinSqlBasicCall.class);
         final GremlinSqlBasicCall right =
@@ -112,6 +113,8 @@ public class GremlinSqlSelectMulti extends GremlinSqlSelect {
                 !(right.getGremlinSqlOperator() instanceof GremlinSqlAsOperator)) {
             throw new SQLException("Error: Expected left and right to have AS operators.");
         }
+
+        LOGGER.debug("Obtaining left and right AS operators.");
         final GremlinSqlAsOperator leftAsOperator = (GremlinSqlAsOperator) left.getGremlinSqlOperator();
         final String leftTableName = sqlMetadata.getActualTableName(leftAsOperator.getName(0, 1));
         final String leftTableRename = leftAsOperator.getName(1, 0);
@@ -144,6 +147,7 @@ public class GremlinSqlSelectMulti extends GremlinSqlSelect {
                     "Error: Joins can only be performed on vertices that are connected by a mutual edge.");
         }
 
+        LOGGER.debug("Checking directionality of JOIN.");
         final String edgeLabel = sqlMetadata.getColumnEdgeLabel(leftColumn);
         // Cases to consider:
         //  1. rightLabel == leftLabel
@@ -164,6 +168,7 @@ public class GremlinSqlSelectMulti extends GremlinSqlSelect {
                 (leftTableName.replace(GremlinTableBase.IN_ID, "").replace(GremlinTableBase.OUT_ID, "")
                         .equals(rightTableName.replace(GremlinTableBase.IN_ID, "")
                                 .replace(GremlinTableBase.OUT_ID, "")))) {
+            LOGGER.debug("Direction: both");
             // Vertices of same label connected by an edge.
             // Doesn't matter how we assign these, but renames need to be different.
             inVLabel = leftTableName;
@@ -171,18 +176,21 @@ public class GremlinSqlSelectMulti extends GremlinSqlSelect {
             inVRename = leftTableRename;
             outVRename = rightTableRename;
         } else if (leftInRightOut) {
+            LOGGER.debug("Direction: left->right");
             // Left vertex is in, right vertex is out
             inVLabel = leftTableName;
             outVLabel = rightTableName;
             inVRename = leftTableRename;
             outVRename = rightTableRename;
         } else if (rightInLeftOut) {
+            LOGGER.debug("Direction: right->left");
             // Right vertex is in, left vertex is out
             inVLabel = rightTableName;
             outVLabel = leftTableName;
             inVRename = rightTableRename;
             outVRename = leftTableRename;
         } else {
+            LOGGER.debug("Direction: None");
             inVLabel = "";
             outVLabel = "";
             inVRename = "";
@@ -202,13 +210,28 @@ public class GremlinSqlSelectMulti extends GremlinSqlSelect {
         final GraphTraversal<?, ?> graphTraversal = g.E().hasLabel(edgeLabel)
                 .where(__.inV().hasLabel(inVLabel))
                 .where(__.outV().hasLabel(outVLabel));
+        LOGGER.debug("Applying group by.");
         applyGroupBy(graphTraversal, edgeLabel, inVRename, outVRename);
+
+        LOGGER.debug("Applying select values.");
         applySelectValues(graphTraversal);
+
+        LOGGER.debug("Applying order by.");
         applyOrderBy(graphTraversal, edgeLabel, inVRename, outVRename);
+
+        LOGGER.debug("Applying having.");
         applyHaving(graphTraversal);
+
+        LOGGER.debug("Applying aggregation fold.");
         SqlTraversalEngine.applyAggregateFold(sqlMetadata, graphTraversal);
+
+        LOGGER.debug("Applying projection.");
         graphTraversal.project(inVRename, outVRename);
+
+        LOGGER.debug("Applying in table retrieval.");
         applyColumnRetrieval(graphTraversal, inVRename, gremlinSqlNodesIn, StepDirection.In);
+
+        LOGGER.debug("Applying out table retrieval.");
         applyColumnRetrieval(graphTraversal, outVRename, gremlinSqlNodesOut, StepDirection.Out);
         return graphTraversal;
     }
@@ -279,6 +302,9 @@ public class GremlinSqlSelectMulti extends GremlinSqlSelect {
     }
 
     protected void applyHaving(final GraphTraversal<?, ?> graphTraversal) throws SQLException {
+        if (sqlSelect.getHaving() == null) {
+            return;
+        }
         throw new SQLException("Error: HAVING is not currently supported for JOIN.");
     }
 }

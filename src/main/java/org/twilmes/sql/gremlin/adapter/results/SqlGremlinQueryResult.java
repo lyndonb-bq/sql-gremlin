@@ -58,6 +58,7 @@ public class SqlGremlinQueryResult {
 
     public SqlGremlinQueryResult(final List<String> columns, final List<GremlinTableBase> gremlinTableBases,
                                  final SqlMetadata sqlMetadata) throws SQLException {
+        System.out.println("SqlGremlinQueryResult start");
         this.columns = columns;
         for (final String column : columns) {
             GremlinProperty col = null;
@@ -69,10 +70,13 @@ public class SqlGremlinQueryResult {
             }
             columnTypes.add((col == null || col.getType() == null) ? "string" : col.getType());
         }
+        System.out.println("SqlGremlinQueryResult end");
     }
 
     public void setPaginationException(final SQLException e) {
+        System.out.println("setPaginationException");
         synchronized (assertEmptyLock) {
+            System.out.println("setPaginationException assertEmptyLock");
             paginationException = e;
             if (currThread != null && blockingQueueRows.size() == 0) {
                 currThread.interrupt();
@@ -81,6 +85,7 @@ public class SqlGremlinQueryResult {
     }
 
     public boolean getIsEmpty() throws SQLException {
+        System.out.println("getIsEmpty");
         if (paginationException == null) {
             return isEmpty;
         }
@@ -88,6 +93,7 @@ public class SqlGremlinQueryResult {
     }
 
     public void assertIsEmpty() {
+        System.out.println("assertIsEmpty");
         synchronized (assertEmptyLock) {
             if (currThread != null && blockingQueueRows.size() == 0) {
                 currThread.interrupt();
@@ -97,20 +103,34 @@ public class SqlGremlinQueryResult {
     }
 
     public void addResults(final List<List<Object>> rows) {
+        System.out.println("addResults");
         blockingQueueRows.addAll(rows);
     }
 
     public Object getResult() throws SQLException {
+        System.out.println("getResult");
         try {
             synchronized (assertEmptyLock) {
+                System.out.println("getResult assertEmptyLock");
                 // Pass current thread in, and interrupt in assertIsEmpty.
                 this.currThread = Thread.currentThread();
                 if (getIsEmpty() && blockingQueueRows.size() == 0) {
                     throw new SQLException(EMPTY_MESSAGE);
                 }
             }
+            System.out.println("blockingQueueRows.take()");
             return this.blockingQueueRows.take();
         } catch (final InterruptedException ignored) {
+            final boolean isEmpty;
+            synchronized (assertEmptyLock) {
+                isEmpty = getIsEmpty();
+            }
+            if (!isEmpty && (paginationException == null)) {
+                // Interrupt is not relevant - retry.
+                System.out.println("Interrupt is not relevant - retry");
+                return getResult();
+            }
+            System.out.println("InterruptedException ignored " + isEmpty + " - " + paginationException);
             if (paginationException != null) {
                 throw paginationException;
             }

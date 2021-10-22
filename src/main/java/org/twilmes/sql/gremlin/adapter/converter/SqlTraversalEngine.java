@@ -19,7 +19,6 @@
 
 package org.twilmes.sql.gremlin.adapter.converter;
 
-import org.apache.tinkerpop.gremlin.groovy.jsr223.GroovyTranslator;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__;
@@ -116,13 +115,12 @@ public class SqlTraversalEngine {
 
         // Primary/foreign key, need to traverse appropriately.
         if (!columnName.endsWith(GremlinTableBase.ID)) {
-            graphTraversal.choose(__.has(columnName), __.values(columnName), __.constant(""));
+            graphTraversal.choose(__.has(columnName), __.values(columnName), __.constant("null"));
         } else {
             // It's this vertex/edge.
             if (columnName.toLowerCase().startsWith(gremlinTableBase.getLabel())) {
                 graphTraversal.id();
             } else {
-                final GraphTraversal<?, ?> edgeGrab;
                 if (columnName.endsWith(IN_ID)) {
                     // Vertices can have many connected, edges (thus we need to fold). Edges can only connect to 1 vertex.
                     if (gremlinTableBase.getIsVertex()) {

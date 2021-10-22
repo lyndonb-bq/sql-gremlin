@@ -19,22 +19,29 @@
 
 package org.twilmes.sql.gremlin.adapter.results.pagination;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.twilmes.sql.gremlin.adapter.converter.ast.nodes.select.GremlinSqlSelectSingle;
 import org.twilmes.sql.gremlin.adapter.converter.schema.gremlin.GremlinTableBase;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 public class SimpleDataReader implements GetRowFromMap {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SimpleDataReader.class);
     final String label;
     final List<String> columnNames;
 
     public SimpleDataReader(final GremlinTableBase tableDef, final List<String> columnNames) {
+        System.out.println("SIMPLE DATA READER START");
         this.label = tableDef.getLabel();
         this.columnNames = columnNames;
+        System.out.println("SIMPLE DATA READER END");
     }
 
     @Override
     public Object[] execute(final Map<String, Object> map) {
+        System.out.println("SIMPLE DATA READER execute");
         final Object[] row = new Object[columnNames.size()];
         int i = 0;
         for (final String column : columnNames) {
